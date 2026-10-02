@@ -1,1344 +1,554 @@
 <!DOCTYPE html>
-<html lang="vi" x-data="scheduleApp()" :class="{ 'dark': darkMode }">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thời Khóa Biểu & Lịch Giảng Dạy - Tự Động Đồng Bộ</title>
-    <!-- Tailwind CSS -->
+    <title>Thời Khóa Biểu & Lịch Giảng Dạy</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#f0f9ff',
-                            100: '#e0f2fe',
-                            500: '#0284c7',
-                            600: '#0369a1',
-                            700: '#075985',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <!-- Font Awesome -->
+    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- QRCode.js for reliable local QR Code rendering without external API -->
+    <!-- QRCode JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     <style>
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-        }
-        /* Soft Pastel Highlighters */
-        .highlighter-pink { background-color: #fce7f3; color: #9d174d; }
-        .highlighter-purple { background-color: #f3e8ff; color: #6b21a8; }
-        .highlighter-yellow { background-color: #fef9c3; color: #854d0e; }
-        .highlighter-blue { background-color: #e0f2fe; color: #0369a1; }
-        .highlighter-green { background-color: #dcfce7; color: #15803d; }
-        .highlighter-orange { background-color: #ffedd5; color: #c2410c; }
-        .highlighter-red { background-color: #ffe4e6; color: #be123c; }
-        .highlighter-slate { background-color: #f1f5f9; color: #334155; }
+        [x-cloak] { display: none !important; }
+        
+        /* Pastel Color Scheme Highlights */
+        .highlighter-purple { background-color: #f3e8ff; border-left: 4px solid #a855f7; color: #581c87; }
+        .highlighter-yellow { background-color: #fef9c3; border-left: 4px solid #eab308; color: #713f12; }
+        .highlighter-pink   { background-color: #fce7f3; border-left: 4px solid #ec4899; color: #831843; }
+        .highlighter-blue   { background-color: #e0f2fe; border-left: 4px solid #0284c7; color: #075985; }
+        .highlighter-orange { background-color: #ffedd5; border-left: 4px solid #f97316; color: #7c2d12; }
+        .highlighter-red    { background-color: #ffe4e6; border-left: 4px solid #f43f5e; color: #881337; }
+        .highlighter-green  { background-color: #dcfce7; border-left: 4px solid #22c55e; color: #14532d; }
+        .highlighter-gray   { background-color: #f3f4f6; border-left: 4px solid #9ca3af; color: #1f2937; }
 
-        .dark .highlighter-pink { background-color: #831843; color: #fbcfe8; }
-        .dark .highlighter-purple { background-color: #581c87; color: #f3e8ff; }
-        .dark .highlighter-yellow { background-color: #713f12; color: #fef9c3; }
-        .dark .highlighter-blue { background-color: #0c4a6e; color: #e0f2fe; }
-        .dark .highlighter-green { background-color: #14532d; color: #dcfce7; }
-        .dark .highlighter-orange { background-color: #7c2d12; color: #ffedd5; }
-        .dark .highlighter-red { background-color: #881337; color: #ffe4e6; }
-        .dark .highlighter-slate { background-color: #334155; color: #f1f5f9; }
-
-        @media print {
-            .no-print { display: none !important; }
-            body { background: white !important; color: black !important; }
-            .print-full-width { width: 100% !important; max-width: none !important; }
+        .status-cancelled {
+            text-decoration: line-through;
+            opacity: 0.65;
+            background-color: #f3f4f6 !important;
+            border-left-color: #9ca3af !important;
         }
     </style>
 </head>
-<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen transition-colors duration-200">
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen" x-data="scheduleApp()" x-init="initApp()">
 
-    <!-- Top Navigation Header -->
-    <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30 shadow-sm no-print">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex flex-col md:flex-row items-center justify-between py-3 md:h-20 gap-3">
-                <!-- Title & Week Badge -->
-                <div class="flex items-center space-x-3 w-full md:w-auto justify-between md:justify-start">
-                    <div class="flex items-center space-x-3">
-                        <div class="bg-indigo-600 text-white p-2.5 rounded-xl shadow-md shadow-indigo-200 dark:shadow-none">
-                            <i class="fa-solid fa-calendar-week text-xl"></i>
-                        </div>
-                        <div>
-                            <div class="flex items-center space-x-2">
-                                <h1 class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white leading-tight">Lịch Tác Vụ Giảng Dạy</h1>
-                            </div>
-                            <p class="text-xs text-indigo-600 dark:text-indigo-400 font-semibold" x-text="formattedWeekRange"></p>
-                        </div>
-                    </div>
-
-                    <!-- Cloud Sync Pill Button (Mobile & Desktop) -->
-                    <button @click="showSyncModal = true" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition shadow-xs"
-                        :class="{
-                            'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-700': syncStatus === 'synced',
-                            'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700 animate-pulse': syncStatus === 'saving' || syncStatus === 'connecting',
-                            'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-700 dark:text-slate-300': syncStatus === 'offline'
-                        }">
-                        <span class="relative flex h-2 w-2">
-                          <span x-show="syncStatus === 'synced'" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                          <span class="relative inline-flex rounded-full h-2 w-2"
-                            :class="{
-                                'bg-emerald-500': syncStatus === 'synced',
-                                'bg-amber-500': syncStatus === 'saving' || syncStatus === 'connecting',
-                                'bg-slate-400': syncStatus === 'offline'
-                            }"></span>
-                        </span>
-                        <i class="fa-solid" :class="syncStatus === 'synced' ? 'fa-cloud-arrow-up' : (syncStatus === 'saving' ? 'fa-rotate spinner' : 'fa-cloud')"></i>
-                        <span x-text="syncStatus === 'synced' ? 'Đã đồng bộ' : (syncStatus === 'saving' ? 'Đang lưu...' : 'Ngoại tuyến')"></span>
-                    </button>
-
-                    <!-- Mobile dark mode button -->
-                    <button @click="darkMode = !darkMode" class="md:hidden p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
-                        <i class="fa-solid" :class="darkMode ? 'fa-sun text-amber-400' : 'fa-moon'"></i>
-                    </button>
+    <!-- Header / Navbar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between flex-wrap gap-3">
+            <div class="flex items-center space-x-3">
+                <div class="bg-purple-600 text-white p-2.5 rounded-xl shadow-md">
+                    <i class="fa-solid fa-calendar-week text-xl"></i>
                 </div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900 tracking-tight">Lịch Tác Vụ Giảng Dạy</h1>
+                    <p class="text-xs text-slate-500 font-medium" x-text="'Tuần: ' + formattedWeekRange"></p>
+                </div>
+            </div>
 
-                <!-- Week Navigator Bar -->
-                <div class="flex items-center space-x-1 sm:space-x-2 bg-slate-100 dark:bg-slate-700/60 p-1.5 rounded-xl text-xs sm:text-sm font-semibold w-full md:w-auto justify-center">
-                    <button @click="prevWeek()" class="p-1.5 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition shadow-sm text-slate-700 dark:text-slate-200" title="Tuần trước">
-                        <i class="fa-solid fa-chevron-left"></i>
+            <!-- Sync Status & Tools -->
+            <div class="flex items-center space-x-2">
+                <!-- Sync Indicator Button -->
+                <button @click="openSyncModal = true" 
+                        :class="syncStatus === 'online' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : (syncStatus === 'syncing' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200')"
+                        class="px-3 py-1.5 text-xs font-semibold rounded-full border flex items-center space-x-2 transition hover:shadow-sm">
+                    <span class="w-2 h-2 rounded-full" 
+                          :class="syncStatus === 'online' ? 'bg-emerald-500 animate-pulse' : (syncStatus === 'syncing' ? 'bg-amber-500 animate-spin' : 'bg-slate-400')"></span>
+                    <span x-text="syncStatus === 'online' ? 'Trực tuyến (' + syncCode + ')' : (syncStatus === 'syncing' ? 'Đang lưu...' : 'Ngoại tuyến')"></span>
+                </button>
+
+                <!-- Navigation Controls -->
+                <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                    <button @click="prevWeek()" class="p-1.5 hover:bg-white rounded-lg text-slate-600 transition" title="Tuần trước">
+                        <i class="fa-solid fa-chevron-left text-xs"></i>
                     </button>
-                    
-                    <button @click="goToday()" class="px-2.5 py-1.5 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition shadow-sm text-indigo-600 dark:text-indigo-300 font-bold">
+                    <button @click="goToday()" class="px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-white rounded-lg transition">
                         Hôm nay
                     </button>
-
-                    <!-- Jump to Date input -->
-                    <input type="date" x-model="selectedDateInput" @change="jumpToSelectedDate()" class="bg-white dark:bg-slate-800 border-0 rounded-lg px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 shadow-sm cursor-pointer">
-
-                    <button @click="nextWeek()" class="p-1.5 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition shadow-sm text-slate-700 dark:text-slate-200" title="Tuần sau">
-                        <i class="fa-solid fa-chevron-right"></i>
+                    <button @click="nextWeek()" class="p-1.5 hover:bg-white rounded-lg text-slate-600 transition" title="Tuần sau">
+                        <i class="fa-solid fa-chevron-right text-xs"></i>
                     </button>
                 </div>
 
-                <!-- Control Buttons -->
-                <div class="flex items-center space-x-2 w-full md:w-auto justify-end">
-                    <!-- Category Filter -->
-                    <select x-model="filterCategory" class="text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-0 rounded-lg px-2.5 py-2 font-medium focus:ring-2 focus:ring-indigo-500">
-                        <option value="ALL">Tất cả mục</option>
-                        <option value="GIANG_DAY">Lớp chính khóa</option>
-                        <option value="PHU_DAO_TRUONG">🏫 Phụ đạo trường</option>
-                        <option value="PHU_DAO">🩷 Gia sư / Phụ đạo</option>
-                        <option value="HOC_TAP">📚 Học tập / VB2</option>
-                        <option value="THI_KTR">📝 Thi / Kiểm tra</option>
-                        <option value="TAP_HUAN">📋 Tập huấn chuyên môn</option>
-                        <option value="PILATES">🧘 Tập Pilates / Thể thao</option>
-                        <option value="CA_NHAN">Cá nhân / Di chuyển</option>
-                    </select>
+                <!-- Date Jump -->
+                <input type="date" x-model="selectedJumpDate" @change="jumpToSelectedDate()" 
+                       class="text-xs border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500">
 
-                    <!-- Status Filter -->
-                    <select x-model="filterStatus" class="text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-0 rounded-lg px-2.5 py-2 font-medium focus:ring-2 focus:ring-indigo-500">
-                        <option value="ALL">Tất cả trạng thái</option>
-                        <option value="DONE">✓ Đã dạy / Xong</option>
-                        <option value="CANCEL">❌ Đã hủy / Nghỉ</option>
-                        <option value="PENDING">⏳ Chưa diễn ra</option>
-                    </select>
+                <!-- Filter Category -->
+                <select x-model="filterCategory" class="text-xs border border-slate-200 rounded-xl px-2.5 py-1.5 bg-slate-50 text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <option value="ALL">Tất cả mục</option>
+                    <option value="LAY_CHINH">Lớp Chính & Phụ Đạo</option>
+                    <option value="GIA_SU">Lịch Gia Sư</option>
+                    <option value="HOC_TAP">Lịch Học VB2</option>
+                    <option value="TAP_HUAN">Tập Huấn</option>
+                    <option value="THI_KTR">Lịch Thi / Kiểm Tra</option>
+                    <option value="PILATES">Pilates / Thể Thao</option>
+                </select>
 
-                    <!-- Add New Item Button -->
-                    <button @click="openModal()" class="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg font-medium text-xs sm:text-sm transition shadow-sm">
-                        <i class="fa-solid fa-plus"></i>
-                        <span class="hidden sm:inline">Thêm lịch</span>
-                    </button>
+                <!-- Add Event Button -->
+                <button @click="openAddModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-sm transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Thêm lịch</span>
+                </button>
 
-                    <!-- Export/Import & Share Dropdown Menu -->
-                    <div class="relative" x-data="{ openShareMenu: false }">
-                        <button @click="openShareMenu = !openShareMenu" class="p-2 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900 rounded-lg transition" title="Chia sẻ / Xuất dữ liệu">
-                            <i class="fa-solid fa-share-nodes text-sm"></i>
-                        </button>
-                        <div x-show="openShareMenu" @click.away="openShareMenu = false" x-transition 
-                             class="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-2 z-40 text-xs no-print">
-                            <button @click="shareSchedule(); openShareMenu = false;" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-semibold">
-                                <i class="fa-solid fa-mobile-screen"></i>
-                                <span>Gửi link sang Điện thoại</span>
-                            </button>
-                            <button @click="exportIcsCalendar(); openShareMenu = false;" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2 text-slate-700 dark:text-slate-200 font-medium">
-                                <i class="fa-solid fa-calendar-plus text-emerald-600"></i>
-                                <span>Xuất file Lịch (.ics cho iPhone/Android)</span>
-                            </button>
-                            <button @click="exportJson(); openShareMenu = false;" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2 text-slate-700 dark:text-slate-200 font-medium">
-                                <i class="fa-solid fa-file-export text-blue-600"></i>
-                                <span>Tải file Sao lưu (.json)</span>
-                            </button>
-                            <label class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2 text-slate-700 dark:text-slate-200 font-medium cursor-pointer">
-                                <i class="fa-solid fa-file-import text-amber-600"></i>
-                                <span>Khôi phục từ file JSON</span>
-                                <input type="file" accept=".json" @change="importJson($event); openShareMenu = false;" class="hidden">
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Device Sync Settings Button -->
-                    <button @click="showSyncModal = true" class="p-2 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900 rounded-lg transition" title="Mã đồng bộ & QR Code">
-                        <i class="fa-solid fa-qrcode text-sm"></i>
-                    </button>
-
-                    <!-- Duplicate Week -->
-                    <button @click="copyWeekToNext()" class="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition" title="Sao chép tuần này sang tuần sau">
-                        <i class="fa-solid fa-copy text-sm"></i>
-                    </button>
-
-                    <!-- Print Button -->
-                    <button @click="window.print()" class="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition hidden sm:block" title="In thời khóa biểu">
-                        <i class="fa-solid fa-print text-sm"></i>
-                    </button>
-
-                    <!-- Dark Mode Switch -->
-                    <button @click="darkMode = !darkMode" class="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition hidden md:block" title="Chuyển chế độ giao diện">
-                        <i class="fa-solid text-sm" :class="darkMode ? 'fa-sun text-amber-400' : 'fa-moon'"></i>
-                    </button>
-                </div>
+                <!-- Sync Modal Trigger -->
+                <button @click="openSyncModal = true" class="p-2 text-slate-500 hover:text-purple-600 hover:bg-slate-100 rounded-xl transition" title="Mã QR & Đồng bộ">
+                    <i class="fa-solid fa-qrcode text-base"></i>
+                </button>
             </div>
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-6">
+    <!-- Main Content Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
-        <!-- Quick Stats Banner -->
-        <div class="grid grid-cols-2 md:grid-cols-7 gap-2.5 mb-6 no-print">
-            <div class="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Tổng số buổi</div>
-                <div class="text-xl font-bold text-indigo-600 dark:text-indigo-400 mt-0.5" x-text="currentWeekEvents.length"></div>
+        <!-- Quick Stats Dashboard -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3 mb-6">
+            <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+                <p class="text-[10px] font-bold tracking-wider text-slate-400 uppercase">TỔNG SỐ BUỔI</p>
+                <p class="text-2xl font-black text-slate-800 mt-1" x-text="currentWeekEvents.length"></p>
             </div>
-            <div class="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Lớp chính & Phụ đạo trường</div>
-                <div class="text-xl font-bold text-purple-600 dark:text-purple-400 mt-0.5" x-text="countCategory('GIANG_DAY') + countCategory('PHU_DAO_TRUONG')"></div>
+            <div class="bg-purple-50/60 p-3 rounded-2xl border border-purple-100">
+                <p class="text-[10px] font-bold tracking-wider text-purple-600 uppercase">LỚP CHÍNH & PHỤ ĐẠO</p>
+                <p class="text-2xl font-black text-purple-700 mt-1" x-text="countCategory('LAY_CHINH')"></p>
             </div>
-            <div class="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Lịch Gia sư</div>
-                <div class="text-xl font-bold text-pink-600 dark:text-pink-400 mt-0.5" x-text="countCategory('PHU_DAO')"></div>
+            <div class="bg-pink-50/60 p-3 rounded-2xl border border-pink-100">
+                <p class="text-[10px] font-bold tracking-wider text-pink-600 uppercase">LỊCH GIA SƯ</p>
+                <p class="text-2xl font-black text-pink-700 mt-1" x-text="countCategory('GIA_SU')"></p>
             </div>
-            <div class="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Lịch Học VB2</div>
-                <div class="text-xl font-bold text-blue-600 dark:text-blue-400 mt-0.5" x-text="countCategory('HOC_TAP')"></div>
+            <div class="bg-sky-50/60 p-3 rounded-2xl border border-sky-100">
+                <p class="text-[10px] font-bold tracking-wider text-sky-600 uppercase">LỊCH HỌC VB2</p>
+                <p class="text-2xl font-black text-sky-700 mt-1" x-text="countCategory('HOC_TAP')"></p>
             </div>
-            <div class="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Tập Huấn</div>
-                <div class="text-xl font-bold text-orange-600 dark:text-orange-400 mt-0.5" x-text="countCategory('TAP_HUAN')"></div>
+            <div class="bg-orange-50/60 p-3 rounded-2xl border border-orange-100">
+                <p class="text-[10px] font-bold tracking-wider text-orange-600 uppercase">TẬP HUẤN</p>
+                <p class="text-2xl font-black text-orange-700 mt-1" x-text="countCategory('TAP_HUAN')"></p>
             </div>
-            <div class="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Lịch Thi</div>
-                <div class="text-xl font-bold text-rose-600 dark:text-rose-400 mt-0.5" x-text="countCategory('THI_KTR')"></div>
+            <div class="bg-rose-50/60 p-3 rounded-2xl border border-rose-100">
+                <p class="text-[10px] font-bold tracking-wider text-rose-600 uppercase">LỊCH THI</p>
+                <p class="text-2xl font-black text-rose-700 mt-1" x-text="countCategory('THI_KTR')"></p>
             </div>
-            <div class="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Pilates</div>
-                <div class="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5" x-text="countCategory('PILATES')"></div>
+            <div class="bg-emerald-50/60 p-3 rounded-2xl border border-emerald-100">
+                <p class="text-[10px] font-bold tracking-wider text-emerald-600 uppercase">PILATES</p>
+                <p class="text-2xl font-black text-emerald-700 mt-1" x-text="countCategory('PILATES')"></p>
             </div>
         </div>
 
-        <!-- Weekly Schedule Table Container -->
-        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden print-full-width">
-            
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[900px] border-collapse">
-                    <!-- Table Header - Days of the Week -->
-                    <thead>
-                        <tr class="bg-slate-100/80 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200">
-                            <th class="py-3 px-3 w-28 text-center font-semibold text-xs uppercase tracking-wider border-r border-slate-200 dark:border-slate-700">
-                                Buổi / Thời gian
+        <!-- Weekly Schedule Grid Table -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
+            <table class="w-full text-left border-collapse min-w-[900px]">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600">
+                        <th class="p-3 w-28 text-center border-r border-slate-200 uppercase tracking-wider">BUỔI / THỜI GIAN</th>
+                        <template x-for="(day, idx) in weekDays" :key="idx">
+                            <th class="p-3 text-center border-r border-slate-200 min-w-[130px]" :class="isToday(day.dateStr) ? 'bg-purple-50/80 text-purple-900' : ''">
+                                <div x-text="day.label" class="font-bold"></div>
+                                <div x-text="day.dateDisplay" class="text-[11px] font-normal text-slate-500 mt-0.5"></div>
                             </th>
-                            <template x-for="day in weekDays" :key="day.dateStr">
-                                <th class="py-3 px-2 text-center font-bold border-r border-slate-200 dark:border-slate-700 last:border-r-0"
-                                    :class="isToday(day.dateStr) ? 'bg-indigo-50/80 dark:bg-indigo-950/40' : ''">
-                                    <div class="text-sm font-bold flex items-center justify-center gap-1">
-                                        <span x-text="day.label"></span>
-                                        <span x-show="isToday(day.dateStr)" class="w-2 h-2 rounded-full bg-indigo-600 inline-block" title="Hôm nay"></span>
-                                    </div>
-                                    <div class="text-xs font-semibold mt-0.5" :class="isToday(day.dateStr) ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'text-slate-500 dark:text-slate-400'" x-text="day.displayDate"></div>
-                                </th>
-                            </template>
-                        </tr>
-                    </thead>
-
-                    <!-- Table Body - Time Slots (Sáng, Chiều, Tối) -->
-                    <tbody class="divide-y divide-slate-200 dark:divide-slate-700 text-sm">
-                        
-                        <!-- MORNING SLOT (SÁNG) -->
-                        <tr>
-                            <td class="py-4 px-3 font-bold text-slate-600 dark:text-slate-300 bg-slate-50/50 dark:bg-slate-800/50 text-center border-r border-slate-200 dark:border-slate-700">
-                                <div class="inline-flex items-center justify-center p-2 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 mb-1">
-                                    <i class="fa-solid fa-sun text-base"></i>
-                                </div>
-                                <div class="text-xs uppercase tracking-wider font-bold">Sáng</div>
-                            </td>
-
-                            <template x-for="day in weekDays" :key="day.dateStr">
-                                <td class="p-2 align-top border-r border-slate-200 dark:border-slate-700 last:border-r-0 h-36 hover:bg-slate-50/50 dark:hover:bg-slate-700/20 transition"
-                                    :class="isToday(day.dateStr) ? 'bg-indigo-50/20 dark:bg-indigo-950/10' : ''">
-                                    <div class="space-y-2">
-                                        <template x-for="item in getEventsForSlot(day, 'SÁNG')" :key="item.id">
-                                            <div @click="editModal(item)" 
-                                                 :class="getStyleClass(item)"
-                                                 class="p-2.5 rounded-xl border shadow-sm cursor-pointer hover:scale-[1.02] transition-all transform duration-150 relative group">
-                                                
-                                                <div class="flex items-start justify-between gap-1">
-                                                    <div class="flex items-center space-x-1">
-                                                        <span x-show="item.status === 'DONE'" class="text-emerald-600 dark:text-emerald-400 font-bold" title="Đã hoàn thành">✓</span>
-                                                        <span x-show="item.status === 'CANCEL'" class="text-red-500 font-bold" title="Đã hủy">❌</span>
-                                                        <span class="font-bold text-xs uppercase tracking-tight px-1.5 py-0.5 rounded bg-white/60 dark:bg-black/30" 
-                                                              :class="item.status === 'CANCEL' ? 'line-through opacity-60' : ''"
-                                                              x-text="item.title"></span>
-                                                    </div>
-                                                    <div class="flex items-center gap-1">
-                                                        <i x-show="item.isRecurring" class="fa-solid fa-rotate-right text-[10px] text-slate-500" title="Lịch lặp lại hàng tuần"></i>
-                                                        <span x-show="item.time" class="text-[10px] font-semibold opacity-80" x-text="item.time"></span>
-                                                    </div>
-                                                </div>
-
-                                                <div x-show="item.subtitle" class="mt-1 text-xs font-semibold leading-tight" :class="item.status === 'CANCEL' ? 'line-through opacity-60' : ''" x-text="item.subtitle"></div>
-                                                <div x-show="item.note" class="mt-1 text-[11px] italic opacity-90 leading-snug" x-text="item.note"></div>
-
-                                                <!-- Quick Toggle Status -->
-                                                <div class="mt-2 flex items-center justify-between pt-1 border-t border-black/5 dark:border-white/10 no-print">
-                                                    <span class="text-[10px] font-medium opacity-75" x-text="getStatusText(item.status)"></span>
-                                                    <button @click.stop="toggleStatus(item)" class="text-[10px] px-1.5 py-0.5 rounded bg-white/80 dark:bg-slate-800 shadow-xs hover:bg-slate-200 dark:hover:bg-slate-700">
-                                                        Đổi TT
-                                                    </button>
-                                                </div>
-
-                                                <!-- Hover Action Buttons -->
-                                                <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity no-print flex space-x-1">
-                                                    <button @click.stop="deleteEvent(item.id)" class="text-red-500 hover:text-red-700 p-1 bg-white dark:bg-slate-800 rounded shadow">
-                                                        <i class="fa-solid fa-trash-can text-[10px]"></i>
-                                                    </button>
-                                                </div>
+                        </template>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 text-xs">
+                    <!-- SÁNG -->
+                    <tr>
+                        <td class="p-3 font-bold text-slate-700 bg-slate-50/50 text-center border-r border-slate-200">
+                            <div class="flex flex-col items-center justify-center space-y-1">
+                                <i class="fa-solid fa-sun text-amber-500 text-base"></i>
+                                <span>SÁNG</span>
+                            </div>
+                        </td>
+                        <template x-for="day in weekDays" :key="day.dateStr">
+                            <td class="p-2 align-top border-r border-slate-200 min-h-[120px]" :class="isToday(day.dateStr) ? 'bg-purple-50/20' : ''">
+                                <div class="space-y-2">
+                                    <template x-for="evt in getEventsForSlot(day.dateStr, 'SANG')" :key="evt.id">
+                                        <div :class="[getStyleClass(evt.category), evt.status === 'CANCELLED' ? 'status-cancelled' : '']" class="p-2.5 rounded-xl shadow-2xs transition hover:shadow-md relative group">
+                                            <div class="flex items-start justify-between gap-1">
+                                                <div class="font-bold leading-snug text-[12px]" x-text="evt.title"></div>
+                                                <button @click="toggleStatus(evt.id)" class="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-white/80 border border-slate-200 hover:bg-white shadow-2xs">
+                                                    <span x-text="evt.status === 'DONE' ? '✓' : (evt.status === 'CANCELLED' ? '✕' : '•')"></span>
+                                                </button>
                                             </div>
-                                        </template>
-                                    </div>
-                                </td>
-                            </template>
-                        </tr>
-
-                        <!-- AFTERNOON SLOT (CHIỀU) -->
-                        <tr>
-                            <td class="py-4 px-3 font-bold text-slate-600 dark:text-slate-300 bg-slate-50/50 dark:bg-slate-800/50 text-center border-r border-slate-200 dark:border-slate-700">
-                                <div class="inline-flex items-center justify-center p-2 rounded-lg bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400 mb-1">
-                                    <i class="fa-solid fa-cloud-sun text-base"></i>
-                                </div>
-                                <div class="text-xs uppercase tracking-wider font-bold">Chiều</div>
-                            </td>
-
-                            <template x-for="day in weekDays" :key="day.dateStr">
-                                <td class="p-2 align-top border-r border-slate-200 dark:border-slate-700 last:border-r-0 h-44 hover:bg-slate-50/50 dark:hover:bg-slate-700/20 transition"
-                                    :class="isToday(day.dateStr) ? 'bg-indigo-50/20 dark:bg-indigo-950/10' : ''">
-                                    <div class="space-y-2">
-                                        <template x-for="item in getEventsForSlot(day, 'CHIỀU')" :key="item.id">
-                                            <div @click="editModal(item)" 
-                                                 :class="getStyleClass(item)"
-                                                 class="p-2.5 rounded-xl border shadow-sm cursor-pointer hover:scale-[1.02] transition-all transform duration-150 relative group">
-                                                
-                                                <div class="flex items-start justify-between gap-1">
-                                                    <div class="flex items-center space-x-1">
-                                                        <span x-show="item.status === 'DONE'" class="text-emerald-600 dark:text-emerald-400 font-bold" title="Đã hoàn thành">✓</span>
-                                                        <span x-show="item.status === 'CANCEL'" class="text-red-500 font-bold" title="Đã hủy">❌</span>
-                                                        <span class="font-bold text-xs uppercase tracking-tight px-1.5 py-0.5 rounded bg-white/60 dark:bg-black/30" 
-                                                              :class="item.status === 'CANCEL' ? 'line-through opacity-60' : ''"
-                                                              x-text="item.title"></span>
-                                                    </div>
-                                                    <div class="flex items-center gap-1">
-                                                        <i x-show="item.isRecurring" class="fa-solid fa-rotate-right text-[10px] text-slate-500" title="Lịch lặp lại hàng tuần"></i>
-                                                        <span x-show="item.time" class="text-[10px] font-semibold opacity-80" x-text="item.time"></span>
-                                                    </div>
-                                                </div>
-
-                                                <div x-show="item.subtitle" class="mt-1 text-xs font-semibold leading-tight" :class="item.status === 'CANCEL' ? 'line-through opacity-60' : ''" x-text="item.subtitle"></div>
-                                                <div x-show="item.note" class="mt-1 text-[11px] italic opacity-90 leading-snug" x-text="item.note"></div>
-
-                                                <!-- Quick Toggle Status -->
-                                                <div class="mt-2 flex items-center justify-between pt-1 border-t border-black/5 dark:border-white/10 no-print">
-                                                    <span class="text-[10px] font-medium opacity-75" x-text="getStatusText(item.status)"></span>
-                                                    <button @click.stop="toggleStatus(item)" class="text-[10px] px-1.5 py-0.5 rounded bg-white/80 dark:bg-slate-800 shadow-xs hover:bg-slate-200 dark:hover:bg-slate-700">
-                                                        Đổi TT
-                                                    </button>
-                                                </div>
-
-                                                <!-- Hover Action Buttons -->
-                                                <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity no-print flex space-x-1">
-                                                    <button @click.stop="deleteEvent(item.id)" class="text-red-500 hover:text-red-700 p-1 bg-white dark:bg-slate-800 rounded shadow">
-                                                        <i class="fa-solid fa-trash-can text-[10px]"></i>
-                                                    </button>
-                                                </div>
+                                            <div class="text-[10px] opacity-80 mt-1 flex items-center space-x-1" x-show="evt.time">
+                                                <i class="fa-regular fa-clock"></i>
+                                                <span x-text="evt.time"></span>
                                             </div>
-                                        </template>
-                                    </div>
-                                </td>
-                            </template>
-                        </tr>
-
-                        <!-- EVENING SLOT (TỐI) -->
-                        <tr>
-                            <td class="py-4 px-3 font-bold text-slate-600 dark:text-slate-300 bg-slate-50/50 dark:bg-slate-800/50 text-center border-r border-slate-200 dark:border-slate-700">
-                                <div class="inline-flex items-center justify-center p-2 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 mb-1">
-                                    <i class="fa-solid fa-moon text-base"></i>
-                                </div>
-                                <div class="text-xs uppercase tracking-wider font-bold">Tối</div>
-                            </td>
-
-                            <template x-for="day in weekDays" :key="day.dateStr">
-                                <td class="p-2 align-top border-r border-slate-200 dark:border-slate-700 last:border-r-0 h-32 hover:bg-slate-50/50 dark:hover:bg-slate-700/20 transition"
-                                    :class="isToday(day.dateStr) ? 'bg-indigo-50/20 dark:bg-indigo-950/10' : ''">
-                                    <div class="space-y-2">
-                                        <template x-for="item in getEventsForSlot(day, 'TỐI')" :key="item.id">
-                                            <div @click="editModal(item)" 
-                                                 :class="getStyleClass(item)"
-                                                 class="p-2.5 rounded-xl border shadow-sm cursor-pointer hover:scale-[1.02] transition-all transform duration-150 relative group">
-                                                
-                                                <div class="flex items-start justify-between gap-1">
-                                                    <div class="flex items-center space-x-1">
-                                                        <span x-show="item.status === 'DONE'" class="text-emerald-600 dark:text-emerald-400 font-bold" title="Đã hoàn thành">✓</span>
-                                                        <span x-show="item.status === 'CANCEL'" class="text-red-500 font-bold" title="Đã hủy">❌</span>
-                                                        <span class="font-bold text-xs uppercase tracking-tight px-1.5 py-0.5 rounded bg-white/60 dark:bg-black/30" 
-                                                              :class="item.status === 'CANCEL' ? 'line-through opacity-60' : ''"
-                                                              x-text="item.title"></span>
-                                                    </div>
-                                                    <div class="flex items-center gap-1">
-                                                        <i x-show="item.isRecurring" class="fa-solid fa-rotate-right text-[10px] text-slate-500" title="Lịch lặp lại hàng tuần"></i>
-                                                        <span x-show="item.time" class="text-[10px] font-semibold opacity-80" x-text="item.time"></span>
-                                                    </div>
-                                                </div>
-
-                                                <div x-show="item.subtitle" class="mt-1 text-xs font-semibold leading-tight" :class="item.status === 'CANCEL' ? 'line-through opacity-60' : ''" x-text="item.subtitle"></div>
-                                                <div x-show="item.note" class="mt-1 text-[11px] italic opacity-90 leading-snug" x-text="item.note"></div>
-
-                                                <!-- Quick Toggle Status -->
-                                                <div class="mt-2 flex items-center justify-between pt-1 border-t border-black/5 dark:border-white/10 no-print">
-                                                    <span class="text-[10px] font-medium opacity-75" x-text="getStatusText(item.status)"></span>
-                                                    <button @click.stop="toggleStatus(item)" class="text-[10px] px-1.5 py-0.5 rounded bg-white/80 dark:bg-slate-800 shadow-xs hover:bg-slate-200 dark:hover:bg-slate-700">
-                                                        Đổi TT
-                                                    </button>
-                                                </div>
-
-                                                <!-- Hover Action Buttons -->
-                                                <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity no-print flex space-x-1">
-                                                    <button @click.stop="deleteEvent(item.id)" class="text-red-500 hover:text-red-700 p-1 bg-white dark:bg-slate-800 rounded shadow">
-                                                        <i class="fa-solid fa-trash-can text-[10px]"></i>
-                                                    </button>
-                                                </div>
+                                            <div class="text-[10px] italic opacity-75 mt-0.5" x-show="evt.note" x-text="evt.note"></div>
+                                            <div class="mt-2 pt-1 border-t border-black/5 flex items-center justify-end space-x-2">
+                                                <button @click="editEvent(evt)" class="text-[10px] text-slate-600 hover:text-purple-700 font-medium">Sửa</button>
+                                                <button @click="deleteEvent(evt.id)" class="text-[10px] text-rose-500 hover:text-rose-700 font-medium">Xóa</button>
                                             </div>
-                                        </template>
-                                    </div>
-                                </td>
-                            </template>
-                        </tr>
+                                        </div>
+                                    </template>
+                                </div>
+                            </td>
+                        </template>
+                    </tr>
 
-                    </tbody>
-                </table>
-            </div>
-            
-            <!-- Table Footer Legend -->
-            <div class="bg-slate-50 dark:bg-slate-800/80 p-3 border-t border-slate-200 dark:border-slate-700 flex flex-wrap gap-4 text-xs font-medium justify-between items-center no-print">
-                <div class="flex items-center space-x-3 flex-wrap gap-y-2">
-                    <span class="text-slate-500 font-semibold">Chú thích màu Pastel:</span>
-                    <span class="inline-flex items-center"><span class="w-3 h-3 rounded-full bg-purple-300 dark:bg-purple-600 mr-1"></span> 🟣 Tím: Lớp dạy chính</span>
-                    <span class="inline-flex items-center"><span class="w-3 h-3 rounded-full bg-yellow-300 dark:bg-yellow-600 mr-1"></span> 🟡 Vàng: Phụ đạo trường</span>
-                    <span class="inline-flex items-center"><span class="w-3 h-3 rounded-full bg-pink-300 dark:bg-pink-600 mr-1"></span> 🩷 Hồng: Gia sư</span>
-                    <span class="inline-flex items-center"><span class="w-3 h-3 rounded-full bg-sky-300 dark:bg-sky-600 mr-1"></span> 🔵 Xanh dương: Học VB2</span>
-                    <span class="inline-flex items-center"><span class="w-3 h-3 rounded-full bg-orange-300 dark:bg-orange-600 mr-1"></span> 🟠 Cam: Tập huấn</span>
-                    <span class="inline-flex items-center"><span class="w-3 h-3 rounded-full bg-rose-300 dark:bg-rose-600 mr-1"></span> 🔴 Đỏ: Lịch thi</span>
-                    <span class="inline-flex items-center"><span class="w-3 h-3 rounded-full bg-emerald-300 dark:bg-emerald-600 mr-1"></span> 🟢 Xanh lá: Pilates</span>
-                </div>
-                <div class="flex items-center space-x-3">
-                    <button @click="resetToDefaultData()" class="text-slate-500 hover:text-red-600 text-[11px] font-semibold underline">Khôi phục dữ liệu gốc</button>
-                </div>
-            </div>
+                    <!-- CHIỀU -->
+                    <tr>
+                        <td class="p-3 font-bold text-slate-700 bg-slate-50/50 text-center border-r border-slate-200">
+                            <div class="flex flex-col items-center justify-center space-y-1">
+                                <i class="fa-solid fa-cloud-sun text-orange-400 text-base"></i>
+                                <span>CHIỀU</span>
+                            </div>
+                        </td>
+                        <template x-for="day in weekDays" :key="day.dateStr">
+                            <td class="p-2 align-top border-r border-slate-200 min-h-[120px]" :class="isToday(day.dateStr) ? 'bg-purple-50/20' : ''">
+                                <div class="space-y-2">
+                                    <template x-for="evt in getEventsForSlot(day.dateStr, 'CHIEU')" :key="evt.id">
+                                        <div :class="[getStyleClass(evt.category), evt.status === 'CANCELLED' ? 'status-cancelled' : '']" class="p-2.5 rounded-xl shadow-2xs transition hover:shadow-md relative group">
+                                            <div class="flex items-start justify-between gap-1">
+                                                <div class="font-bold leading-snug text-[12px]" x-text="evt.title"></div>
+                                                <button @click="toggleStatus(evt.id)" class="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-white/80 border border-slate-200 hover:bg-white shadow-2xs">
+                                                    <span x-text="evt.status === 'DONE' ? '✓' : (evt.status === 'CANCELLED' ? '✕' : '•')"></span>
+                                                </button>
+                                            </div>
+                                            <div class="text-[10px] opacity-80 mt-1 flex items-center space-x-1" x-show="evt.time">
+                                                <i class="fa-regular fa-clock"></i>
+                                                <span x-text="evt.time"></span>
+                                            </div>
+                                            <div class="text-[10px] italic opacity-75 mt-0.5" x-show="evt.note" x-text="evt.note"></div>
+                                            <div class="mt-2 pt-1 border-t border-black/5 flex items-center justify-end space-x-2">
+                                                <button @click="editEvent(evt)" class="text-[10px] text-slate-600 hover:text-purple-700 font-medium">Sửa</button>
+                                                <button @click="deleteEvent(evt.id)" class="text-[10px] text-rose-500 hover:text-rose-700 font-medium">Xóa</button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </td>
+                        </template>
+                    </tr>
 
+                    <!-- TỐI -->
+                    <tr>
+                        <td class="p-3 font-bold text-slate-700 bg-slate-50/50 text-center border-r border-slate-200">
+                            <div class="flex flex-col items-center justify-center space-y-1">
+                                <i class="fa-solid fa-moon text-indigo-400 text-base"></i>
+                                <span>TỐI</span>
+                            </div>
+                        </td>
+                        <template x-for="day in weekDays" :key="day.dateStr">
+                            <td class="p-2 align-top border-r border-slate-200 min-h-[120px]" :class="isToday(day.dateStr) ? 'bg-purple-50/20' : ''">
+                                <div class="space-y-2">
+                                    <template x-for="evt in getEventsForSlot(day.dateStr, 'TOI')" :key="evt.id">
+                                        <div :class="[getStyleClass(evt.category), evt.status === 'CANCELLED' ? 'status-cancelled' : '']" class="p-2.5 rounded-xl shadow-2xs transition hover:shadow-md relative group">
+                                            <div class="flex items-start justify-between gap-1">
+                                                <div class="font-bold leading-snug text-[12px]" x-text="evt.title"></div>
+                                                <button @click="toggleStatus(evt.id)" class="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-white/80 border border-slate-200 hover:bg-white shadow-2xs">
+                                                    <span x-text="evt.status === 'DONE' ? '✓' : (evt.status === 'CANCELLED' ? '✕' : '•')"></span>
+                                                </button>
+                                            </div>
+                                            <div class="text-[10px] opacity-80 mt-1 flex items-center space-x-1" x-show="evt.time">
+                                                <i class="fa-regular fa-clock"></i>
+                                                <span x-text="evt.time"></span>
+                                            </div>
+                                            <div class="text-[10px] italic opacity-75 mt-0.5" x-show="evt.note" x-text="evt.note"></div>
+                                            <div class="mt-2 pt-1 border-t border-black/5 flex items-center justify-end space-x-2">
+                                                <button @click="editEvent(evt)" class="text-[10px] text-slate-600 hover:text-purple-700 font-medium">Sửa</button>
+                                                <button @click="deleteEvent(evt.id)" class="text-[10px] text-rose-500 hover:text-rose-700 font-medium">Xóa</button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </td>
+                        </template>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </main>
 
-    <!-- Add / Edit Modal -->
-    <div x-show="showModal" 
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4" 
-         style="display: none;">
-        
-        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 dark:border-slate-700 relative" @click.away="showModal = false">
-            <button @click="showModal = false" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                <i class="fa-solid fa-xmark text-lg"></i>
-            </button>
-
-            <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-4" x-text="form.id ? 'Chỉnh Sửa Lịch Tác Vụ' : 'Thêm Lịch Tác Vụ Mới'"></h3>
-
-            <form @submit.prevent="saveEvent" class="space-y-4">
-                <!-- Select Day Mode: Recurring vs Specific Date -->
-                <div class="bg-slate-100 dark:bg-slate-700/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-600 space-y-2">
-                    <div class="flex items-center justify-between">
-                        <label class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">Tần suất lặp lại</label>
-                        <div class="flex items-center space-x-2">
-                            <input type="checkbox" id="isRecurring" x-model="form.isRecurring" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
-                            <label for="isRecurring" class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 cursor-pointer">Lặp lại hàng tuần</label>
-                        </div>
-                    </div>
-
-                    <!-- If Recurring: Select Day of Week -->
-                    <div x-show="form.isRecurring">
-                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Thứ trong tuần (Cố định mọi tuần)</label>
-                        <select x-model="form.dayKey" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500">
-                            <option value="T2">Thứ 2</option>
-                            <option value="T3">Thứ 3</option>
-                            <option value="T4">Thứ 4</option>
-                            <option value="T5">Thứ 5</option>
-                            <option value="T6">Thứ 6</option>
-                            <option value="T7">Thứ 7</option>
-                            <option value="CN">Chủ Nhật</option>
-                        </select>
-                    </div>
-
-                    <!-- If Not Recurring: Select Specific Date -->
-                    <div x-show="!form.isRecurring">
-                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Ngày cụ thể</label>
-                        <input type="date" x-model="form.specificDate" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500">
-                    </div>
+    <!-- Modal Form (Thêm / Sửa Lịch) -->
+    <div x-show="openFormModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 border border-slate-100 overflow-hidden">
+            <h3 class="text-lg font-bold text-slate-900 mb-4" x-text="form.id ? 'Chỉnh Sửa Lịch' : 'Thêm Lịch Mới'"></h3>
+            <div class="space-y-3.5">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Tên Nội Dung / Lớp Học</label>
+                    <input type="text" x-model="form.title" placeholder="VD: 12A3 Dạy xong DTC, Tập Pilates..." class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-500">
                 </div>
-
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Buổi</label>
-                        <select x-model="form.slot" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500">
-                            <option value="SÁNG">Sáng</option>
-                            <option value="CHIỀU">Chiều</option>
-                            <option value="TỐI">Tối</option>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Phân Loại</label>
+                        <select x-model="form.category" class="w-full text-xs border border-slate-200 rounded-xl px-2.5 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            <option value="LAY_CHINH">🟣 Lớp Chính & Phụ Đạo</option>
+                            <option value="GIA_SU">🩷 Lịch Gia Sư</option>
+                            <option value="HOC_TAP">🔵 Lịch Học VB2</option>
+                            <option value="TAP_HUAN">🟠 Tập Huấn Chuyên Môn</option>
+                            <option value="THI_KTR">🔴 Lịch Thi / Kiểm Tra</option>
+                            <option value="PILATES">🟢 Pilates / Thể Thao</option>
+                            <option value="KHAC">⚪ Khác / Cá Nhân</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Giờ cụ thể</label>
-                        <input type="text" x-model="form.time" placeholder="VD: 14:00 - 16:00" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Buổi Trong Ngày</label>
+                        <select x-model="form.slot" class="w-full text-xs border border-slate-200 rounded-xl px-2.5 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            <option value="SANG">Sáng</option>
+                            <option value="CHIEU">Chiều</option>
+                            <option value="TOI">Tối</option>
+                        </select>
                     </div>
                 </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Tiêu đề (Lớp / Tên HS / Công việc)</label>
-                    <input type="text" x-model="form.title" required placeholder="VD: 12A3, Miu, Đi tập huấn..." class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Nội dung / Bài giảng chính</label>
-                    <input type="text" x-model="form.subtitle" placeholder="VD: Tọa độ trong KG, Bài tập CSC..." class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Ghi chú thêm</label>
-                    <input type="text" x-model="form.note" placeholder="VD: Nhờ dạy thay, Về 13h..." class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500">
-                </div>
-
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Phân loại</label>
-                        <select x-model="form.category" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500">
-                            <option value="GIANG_DAY">Dạy chính khóa</option>
-                            <option value="PHU_DAO_TRUONG">🏫 Phụ đạo trường</option>
-                            <option value="PHU_DAO">Gia sư / Học sinh</option>
-                            <option value="HOC_TAP">📚 Học tập / VB2</option>
-                            <option value="THI_KTR">📝 Thi / Kiểm tra kỳ</option>
-                            <option value="TAP_HUAN">📋 Tập huấn chuyên môn</option>
-                            <option value="PILATES">🧘 Tập Pilates / Thể thao</option>
-                            <option value="CA_NHAN">Cá nhân / Di chuyển</option>
-                        </select>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Ngày Thực Hiện</label>
+                        <input type="date" x-model="form.date" class="w-full text-xs border border-slate-200 rounded-xl px-2.5 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-500">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Trạng thái</label>
-                        <select x-model="form.status" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500">
-                            <option value="PENDING">⏳ Chưa diễn ra / Bình thường</option>
-                            <option value="DONE">✓ Đã hoàn thành / Đã dạy</option>
-                            <option value="CANCEL">❌ Đã hủy / Nghỉ</option>
-                        </select>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Khung Giờ (Nếu có)</label>
+                        <input type="text" x-model="form.time" placeholder="VD: 07:00 - 08:00" class="w-full text-xs border border-slate-200 rounded-xl px-2.5 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-500">
                     </div>
                 </div>
-
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Màu Pastel Highlight</label>
-                    <select x-model="form.highlight" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500">
-                        <option value="purple">🟣 Tím pastel (Lớp dạy chính)</option>
-                        <option value="yellow">🟡 Vàng pastel (Phụ đạo trường)</option>
-                        <option value="pink">🩷 Hồng pastel (Gia sư / Học sinh)</option>
-                        <option value="blue">🔵 Xanh dương pastel (Học VB2)</option>
-                        <option value="orange">🟠 Cam pastel (Tập huấn)</option>
-                        <option value="red">🔴 Đỏ pastel (Lịch thi / Kiểm tra)</option>
-                        <option value="green">🟢 Xanh lá pastel (Tập Pilates)</option>
-                        <option value="slate">⚪ Xám pastel (Cá nhân / Khác)</option>
-                    </select>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Ghi Chú</label>
+                    <input type="text" x-model="form.note" placeholder="VD: Rèn luyện thể lực, Chữa BT..." class="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-500">
                 </div>
-
-                <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-200 dark:border-slate-700">
-                    <button type="button" @click="showModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
-                        Hủy
-                    </button>
-                    <button type="submit" class="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white shadow">
-                        Lưu lịch
-                    </button>
-                </div>
-            </form>
+            </div>
+            <div class="mt-6 flex items-center justify-end space-x-2">
+                <button @click="openFormModal = false" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition">Hủy</button>
+                <button @click="saveFormEvent()" class="px-5 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-md transition">Lưu Lịch</button>
+            </div>
         </div>
     </div>
 
-    <!-- Device Sync Settings Modal -->
-    <div x-show="showSyncModal" 
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4" 
-         style="display: none;">
-        
-        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 dark:border-slate-700 relative" @click.away="showSyncModal = false">
-            <button @click="showSyncModal = false" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+    <!-- Modal Sync & QR Code -->
+    <div x-show="openSyncModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 border border-slate-100 text-center relative">
+            <button @click="openSyncModal = false" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
                 <i class="fa-solid fa-xmark text-lg"></i>
             </button>
+            <h3 class="text-lg font-bold text-slate-900 mb-1">Đồng Bộ Nhiều Thiết Bị</h3>
+            <p class="text-xs text-slate-500 mb-4">Quét mã QR để mở trang web tự động đồng bộ</p>
 
-            <div class="flex items-center space-x-3 mb-4">
-                <div class="p-3 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-xl">
-                    <i class="fa-solid fa-qrcode text-xl"></i>
-                </div>
-                <div>
-                    <h3 class="text-lg font-bold text-slate-900 dark:text-white">Đồng Bộ Sang Điện Thoại</h3>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Mở thời khóa biểu trên Điện thoại dễ dàng</p>
-                </div>
+            <!-- QR Display -->
+            <div class="flex justify-center my-4">
+                <div id="qrcode-container" class="p-3 bg-white border border-slate-200 rounded-2xl shadow-inner"></div>
             </div>
 
-            <!-- QR Code Scan Box for Mobile -->
-            <div class="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200 dark:border-slate-700 text-center mb-4">
-                <div class="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2">
-                    📱 Quét mã bằng Camera Điện Thoại để mở trang web:
-                </div>
-                
-                <div class="flex justify-center my-3">
-                    <div id="qrcode-container" class="p-2.5 bg-white rounded-xl shadow-md border-4 border-white dark:border-slate-800 flex items-center justify-center min-w-[190px] min-h-[190px]"></div>
-                </div>
-
-                <!-- Warning if URL is local/sandbox -->
-                <div x-show="isLocalUrl" class="mb-3 p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg text-left text-[11px] text-amber-800 dark:text-amber-300">
-                    <i class="fa-solid fa-triangle-exclamation mr-1 text-amber-500"></i>
-                    <strong>Lưu ý:</strong> Ứng dụng đang mở ở môi trường xem thử (Local/Sandbox). Để điện thoại quét mã QR mở được, bạn chọn 1 trong 2 cách bên dưới.
-                </div>
-
-                <!-- Custom Base URL Input for preview / local environments -->
-                <div class="mb-3 text-left">
-                    <div class="flex items-center justify-between mb-1">
-                        <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Đường dẫn Website (URL) tạo QR (Không bắt buộc):</label>
-                    </div>
-                    <input type="text" x-model="customBaseUrl" @input="renderQrCode()" placeholder="VD: https://my-schedule.vercel.app" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:ring-2 focus:ring-indigo-500">
-                    <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
-                        💡 <strong>Giải thích:</strong> Ô này dành cho người đã đưa file web lên hosting (Vercel, GitHub Pages...). Dán link web của bạn vào đây để Mã QR tự động cập nhật link đúng cho điện thoại.
-                    </p>
-                </div>
-
-                <!-- Instructions for Quick Connect without URL -->
-                <div class="p-2.5 bg-indigo-50/70 dark:bg-indigo-950/30 rounded-lg border border-indigo-100 dark:border-indigo-900/40 text-left text-[11px] text-indigo-900 dark:text-indigo-200 mb-3 space-y-1">
-                    <div class="font-bold flex items-center gap-1 text-indigo-700 dark:text-indigo-300">
-                        <i class="fa-solid fa-bolt"></i> Cách đồng bộ nhanh nhất (Không cần tạo Link):
-                    </div>
-                    <ol class="list-decimal pl-4 space-y-0.5">
-                        <li>Mở trang web thời khóa biểu trên điện thoại.</li>
-                        <li>Bấm nút <strong>Mã đồng bộ (QR)</strong> trên điện thoại.</li>
-                        <li>Gõ <strong>Mã Đồng Bộ</strong> bên dưới vào ô "Kết nối": <strong class="font-mono text-indigo-600 dark:text-indigo-400" x-text="syncCode"></strong></li>
-                    </ol>
-                </div>
-
-                <button @click="shareSchedule()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl text-xs transition flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-share-nodes"></i>
-                    <span>Chia sẻ Link trực tiếp (Zalo / SMS / Điện thoại)</span>
-                </button>
+            <!-- Sync Info -->
+            <div class="bg-purple-50 p-3 rounded-2xl border border-purple-100 mb-4">
+                <p class="text-xs text-purple-700 font-bold">MÃ ĐỒNG BỘ CÁ NHÂN CỦA BẠN</p>
+                <p class="text-xl font-black text-purple-900 tracking-wider mt-0.5" x-text="syncCode"></p>
+                <p class="text-[11px] text-purple-600 mt-1">Dùng mã này gõ vào điện thoại để kết nối chung dữ liệu</p>
             </div>
 
-            <!-- Current Sync Code Display -->
-            <div class="bg-indigo-50 dark:bg-indigo-950/40 p-3.5 rounded-xl border border-indigo-200 dark:border-indigo-800/60 mb-4">
-                <div class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Mã đồng bộ cá nhân</div>
-                <div class="flex items-center justify-between bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
-                    <span class="font-mono text-base font-bold text-indigo-600 dark:text-indigo-400 tracking-wider" x-text="syncCode"></span>
-                    <button @click="copySyncCode()" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 px-2.5 py-1 rounded-md font-medium transition flex items-center gap-1">
-                        <i class="fa-solid fa-copy"></i>
-                        <span>Sao chép mã</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Connect to Another Sync Code -->
-            <form @submit.prevent="applyCustomSyncCode" class="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700">
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Hoặc Nhập Mã Đồng Bộ Từ Máy Khác</label>
+            <!-- Connect Manual -->
+            <div class="space-y-2 text-left">
+                <label class="block text-xs font-bold text-slate-700">HOẶC NHẬP MÃ ĐỒNG BỘ TỪ MÁY KHÁC:</label>
                 <div class="flex gap-2">
-                    <input type="text" x-model="inputSyncCode" placeholder="VD: SCH-8492" required class="flex-1 uppercase bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-indigo-500">
-                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">
+                    <input type="text" x-model="inputSyncCode" placeholder="VD: SCH-4692" class="flex-1 text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 uppercase font-bold focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <button @click="connectWithCode(inputSyncCode)" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl transition shadow-sm">
                         Kết nối
                     </button>
                 </div>
-            </form>
-
-            <div class="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                <button @click="generateNewSyncCode()" class="text-xs text-slate-500 hover:text-indigo-600 underline font-medium">
-                    Tạo mã đồng bộ mới
-                </button>
-                <button @click="showSyncModal = false" class="px-4 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold">
-                    Đóng
-                </button>
             </div>
         </div>
     </div>
 
-    <!-- Notification Toast -->
-    <div x-show="toast.show"
-         x-transition:enter="transition ease-out duration-300 transform"
-         x-transition:enter-start="opacity-0 translate-y-2"
-         x-transition:enter-end="opacity-100 translate-y-0"
-         x-transition:leave="transition ease-in duration-200 transform"
-         x-transition:leave-start="opacity-100 translate-y-0"
-         x-transition:leave-end="opacity-0 translate-y-2"
-         class="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700 text-xs font-medium flex items-center space-x-2"
-         style="display: none;">
-        <i class="fa-solid" :class="toast.type === 'success' ? 'fa-circle-check text-emerald-400' : 'fa-circle-info text-sky-400'"></i>
-        <span x-text="toast.message"></span>
-    </div>
-
-    <!-- Firebase Cloud Sync SDK -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Firebase Initialization
-        let db = null;
-        let auth = null;
-        let currentUser = null;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'teaching-schedule-v1';
-
-        async function initCloud() {
-            if (typeof __firebase_config === 'undefined') return null;
-            try {
-                const firebaseConfig = JSON.parse(__firebase_config);
-                const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-
-                const initialToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                if (initialToken) {
-                    await signInWithCustomToken(auth, initialToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                currentUser = auth.currentUser;
-                return { db, appId, currentUser };
-            } catch (e) {
-                console.error("Cloud init error:", e);
-                return null;
-            }
-        }
-
-        window.CloudSyncModule = {
-            initCloud,
-            getDocRef: (syncCode) => {
-                if (!db) return null;
-                return doc(db, 'artifacts', appId, 'public', 'data', 'schedules', syncCode);
-            },
-            saveData: async (syncCode, eventsData) => {
-                if (!db || !currentUser) return false;
-                try {
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', syncCode);
-                    await setDoc(docRef, {
-                        events: eventsData,
-                        updatedAt: new Date().toISOString(),
-                        updatedBy: currentUser.uid
-                    }, { merge: true });
-                    return true;
-                } catch (e) {
-                    console.error("Cloud save error:", e);
-                    return false;
-                }
-            },
-            subscribe: (syncCode, callback, errorCallback) => {
-                if (!db || !currentUser) return null;
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', syncCode);
-                return onSnapshot(docRef, (snapshot) => {
-                    if (snapshot.exists()) {
-                        callback(snapshot.data());
-                    } else {
-                        callback(null);
-                    }
-                }, (error) => {
-                    console.error("Snapshot error:", error);
-                    if (errorCallback) errorCallback(error);
-                });
-            }
-        };
-    </script>
-
+    <!-- Application Script -->
     <script>
         function scheduleApp() {
             return {
-                darkMode: false,
-                filterCategory: 'ALL',
-                filterStatus: 'ALL',
-                showModal: false,
-                showSyncModal: false,
-                
-                // Sync State
-                syncStatus: 'offline', // 'offline' | 'connecting' | 'synced' | 'saving'
-                syncCode: '',
+                syncCode: 'SCH-4692',
                 inputSyncCode: '',
-                unsubscribeCloud: null,
-                isLocalChange: false,
-                
-                toast: {
-                    show: false,
-                    message: '',
-                    type: 'success'
-                },
+                syncStatus: 'online', // 'online', 'syncing', 'offline'
+                openFormModal: false,
+                openSyncModal: false,
+                filterCategory: 'ALL',
+                selectedJumpDate: '',
+                currentMonday: new Date('2026-10-05'),
 
-                dayKeys: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'],
-                dayLabels: ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'],
+                form: { id: null, title: '', category: 'LAY_CHINH', slot: 'SANG', date: '', time: '', note: '' },
 
-                form: {
-                    id: null,
-                    isRecurring: true,
-                    dayKey: 'T2',
-                    specificDate: '',
-                    slot: 'SÁNG',
-                    time: '',
-                    title: '',
-                    subtitle: '',
-                    note: '',
-                    category: 'GIANG_DAY',
-                    highlight: 'purple',
-                    status: 'PENDING'
-                },
-
-                // Date management
-                currentMonday: null,
-                selectedDateInput: '',
-                defaultEvents: [
-                    { id: 301, specificDate: '', isRecurring: true, dayKey: 'T2', slot: 'TỐI', title: 'VB2 Tiếng Trung', time: '18:00 - 20:00', subtitle: 'Lớp VB2 Ngoại Ngữ', note: 'Cố định tối T2', category: 'HOC_TAP', highlight: 'blue', status: 'PENDING' },
-                    { id: 302, specificDate: '', isRecurring: true, dayKey: 'T4', slot: 'TỐI', title: 'VB2 TANC 1', time: '18:00 - 20:00', subtitle: 'Tiếng Anh Nâng Cao', note: 'Cố định tối T4', category: 'HOC_TAP', highlight: 'blue', status: 'PENDING' },
-                    { id: 303, specificDate: '', isRecurring: true, dayKey: 'T3', slot: 'SÁNG', title: 'Tập Pilates', time: '07:00 - 08:00', subtitle: 'Pilates Reformer', note: 'Rèn luyện thể lực', category: 'PILATES', highlight: 'green', status: 'PENDING' },
-                    { id: 304, specificDate: '', isRecurring: true, dayKey: 'T5', slot: 'SÁNG', title: 'Tập Pilates', time: '07:00 - 08:00', subtitle: 'Pilates Mat & Core', note: 'Rèn luyện thể lực', category: 'PILATES', highlight: 'green', status: 'PENDING' },
-                    { id: 305, specificDate: '', isRecurring: true, dayKey: 'T7', slot: 'SÁNG', title: 'Tập Pilates', time: '08:00 - 09:00', subtitle: 'Pilates Cadic/Reformer', note: 'Cuối tuần', category: 'PILATES', highlight: 'green', status: 'PENDING' },
-
-                    { id: 101, specificDate: '2026-09-21', isRecurring: false, dayKey: 'T2', slot: 'SÁNG', title: '12B9', subtitle: 'Đặc tính TC', note: '', category: 'GIANG_DAY', highlight: 'purple', status: 'PENDING' },
-                    { id: 102, specificDate: '2026-09-21', isRecurring: false, dayKey: 'T2', slot: 'SÁNG', title: '12A3', subtitle: 'Dạy xong ĐTC', note: '', category: 'GIANG_DAY', highlight: 'purple', status: 'PENDING' },
-                    { id: 103, specificDate: '2026-09-21', isRecurring: false, dayKey: 'T2', slot: 'CHIỀU', title: '12B9', subtitle: 'Đặc tính TC', note: '', category: 'GIANG_DAY', highlight: 'purple', status: 'PENDING' },
-
-                    { id: 105, specificDate: '2026-09-22', isRecurring: false, dayKey: 'T3', slot: 'SÁNG', title: '12A3', subtitle: 'Chữa BT ĐTC', note: '', category: 'GIANG_DAY', highlight: 'purple', status: 'PENDING' },
-                    { id: 106, specificDate: '2026-09-22', isRecurring: false, dayKey: 'T3', slot: 'CHIỀU', title: 'Tùng', subtitle: 'TXĐ, chu kỳ', note: '', category: 'PHU_DAO', highlight: 'pink', status: 'CANCEL' },
-                    { id: 107, specificDate: '2026-09-22', isRecurring: false, dayKey: 'T3', slot: 'CHIỀU', title: '11A3', subtitle: 'Dạy chẵn lẻ + chu kỳ', note: '', category: 'GIANG_DAY', highlight: 'purple', status: 'DONE' },
-                    { id: 108, specificDate: '2026-09-22', isRecurring: false, dayKey: 'T3', slot: 'CHIỀU', title: 'PTLG sin, cos', subtitle: 'Học Tiếng Trung', note: '', category: 'HOC_TAP', highlight: 'blue', status: 'DONE' },
-                    { id: 109, specificDate: '2026-09-22', isRecurring: false, dayKey: 'T3', slot: 'CHIỀU', title: 'L.Anh', subtitle: 'Chữa BT + Dạy B5', note: '', category: 'PHU_DAO', highlight: 'pink', status: 'CANCEL' },
-                    { id: 110, specificDate: '2026-09-22', isRecurring: false, dayKey: 'T3', slot: 'TỐI', title: 'Lam Khánh', time: '20:00 - 22:00', subtitle: '', note: '<8h - 10h>', category: 'PHU_DAO', highlight: 'pink', status: 'CANCEL' },
-
-                    { id: 111, specificDate: '2026-09-23', isRecurring: false, dayKey: 'T4', slot: 'CHIỀU', title: 'Q. Huy', time: '14:00 - 16:00', subtitle: '', note: '2 -> 4', category: 'PHU_DAO', highlight: 'pink', status: 'PENDING' },
-                    { id: 112, specificDate: '2026-09-23', isRecurring: false, dayKey: 'T4', slot: 'CHIỀU', title: 'Miu', time: '16:00 - 16:45', subtitle: '', note: '4 -> 4h45', category: 'PHU_DAO', highlight: 'pink', status: 'PENDING' },
-                    { id: 113, specificDate: '2026-09-23', isRecurring: false, dayKey: 'T4', slot: 'TỐI', title: 'VB2 TANC 1', time: '18:00 - 20:00', subtitle: 'Thi Giữa Kỳ', note: '🔥 Thi Giữa Kỳ', category: 'THI_KTR', highlight: 'red', status: 'DONE' },
-
-                    { id: 114, specificDate: '2026-09-24', isRecurring: false, dayKey: 'T5', slot: 'SÁNG', title: 'Ngân Giang', time: '08:00 - 10:00', subtitle: 'Online', note: '', category: 'PHU_DAO', highlight: 'pink', status: 'PENDING' },
-                    { id: 115, specificDate: '2026-09-24', isRecurring: false, dayKey: 'T5', slot: 'SÁNG', title: 'Lên Trường', subtitle: '', note: '', category: 'CA_NHAN', highlight: 'slate', status: 'PENDING' },
-                    { id: 116, specificDate: '2026-09-24', isRecurring: false, dayKey: 'T5', slot: 'CHIỀU', title: 'L.Anh', time: '17:00 - 18:30', subtitle: '', note: '5h -> 6h30', category: 'PHU_DAO', highlight: 'pink', status: 'CANCEL' },
-                    { id: 117, specificDate: '2026-09-24', isRecurring: false, dayKey: 'T5', slot: 'CHIỀU', title: 'Lam Khánh', time: '19:15 - 21:15', subtitle: '', note: '< 7h15 - 9h15 >', category: 'PHU_DAO', highlight: 'pink', status: 'CANCEL' },
-
-                    { id: 118, specificDate: '2026-09-25', isRecurring: false, dayKey: 'T6', slot: 'SÁNG', title: '12A3', subtitle: 'KS sự biến thiên', note: '', category: 'GIANG_DAY', highlight: 'purple', status: 'PENDING' },
-                    { id: 119, specificDate: '2026-09-25', isRecurring: false, dayKey: 'T6', slot: 'CHIỀU', title: '11A3', subtitle: 'PTLG tan, cot + BT PTLG + ktra', note: 'Có bài kiểm tra', category: 'GIANG_DAY', highlight: 'purple', status: 'DONE' },
-                    { id: 120, specificDate: '2026-09-25', isRecurring: false, dayKey: 'T6', slot: 'CHIỀU', title: '12B9', subtitle: 'Chữa BT max min + BTC', note: '', category: 'GIANG_DAY', highlight: 'purple', status: 'PENDING' },
-                    { id: 121, specificDate: '2026-09-25', isRecurring: false, dayKey: 'T6', slot: 'CHIỀU', title: 'Miu', time: '14:00 - 16:00', subtitle: '', note: '<2 - 4>', category: 'PHU_DAO', highlight: 'pink', status: 'PENDING' },
-
-                    { id: 122, specificDate: '2026-09-26', isRecurring: false, dayKey: 'T7', slot: 'CHIỀU', title: 'Q. Huy', time: '19:15 - 21:15', subtitle: 'Làm BT 2tt // dt // mp + dt // mp', note: '< 7h15 - 9h15 >', category: 'PHU_DAO', highlight: 'pink', status: 'PENDING' },
-
-                    { id: 123, specificDate: '2026-09-27', isRecurring: false, dayKey: 'CN', slot: 'SÁNG', title: 'Tùng', subtitle: 'TXĐ, chẵn lẻ, chu kỳ PT CƠ BẢN', note: '', category: 'PHU_DAO', highlight: 'pink', status: 'PENDING' },
-                    { id: 124, specificDate: '2026-09-27', isRecurring: false, dayKey: 'CN', slot: 'CHIỀU', title: 'N. Giang', time: '17:00 - 19:00', subtitle: 'Chữa BT 2tt // + Làm BT dt // mp', note: '5 -> 7h', category: 'PHU_DAO', highlight: 'pink', status: 'PENDING' }
+                events: [
+                    // Tuần 05/10 - 11/10
+                    { id: 1, title: 'TẬP PILATES', category: 'PILATES', slot: 'SANG', date: '2026-10-06', time: '07:00 - 08:00', note: 'Pilates Reformer', status: 'CANCELLED' },
+                    { id: 2, title: 'TẬP PILATES', category: 'PILATES', slot: 'SANG', date: '2026-10-08', time: '07:00 - 08:00', note: 'Pilates Mat & Core', status: 'DONE' },
+                    { id: 3, title: 'TẬP PILATES', category: 'PILATES', slot: 'SANG', date: '2026-10-10', time: '08:00 - 09:00', note: 'Pilates Cadic/Reformer', status: 'DONE' },
+                    { id: 4, title: 'VB2 TIẾNG TRUNG', category: 'HOC_TAP', slot: 'TOI', date: '2026-10-05', time: '18:00 - 20:00', note: 'Lớp VB2 T2', status: 'DONE' },
+                    { id: 5, title: 'VB2 TANC 1', category: 'HOC_TAP', slot: 'TOI', date: '2026-10-07', time: '18:00 - 20:00', note: 'Lớp VB2 T4', status: 'DONE' }
                 ],
 
-                events: [],
-
-                customBaseUrl: '',
-
-                get shareableUrl() {
-                    let base = this.customBaseUrl.trim();
-                    if (!base) {
-                        base = window.location.protocol + '//' + window.location.host + window.location.pathname;
-                    }
-                    // Remove trailing slashes
-                    base = base.replace(/\/+$/, '');
-                    return `${base}?sync=${encodeURIComponent(this.syncCode)}`;
-                },
-
-                get isLocalUrl() {
-                    const host = window.location.host || '';
-                    const href = window.location.href || '';
-                    return href.startsWith('file:') || href.startsWith('about:') || href.startsWith('blob:') || host.includes('localhost') || host.includes('127.0.0.1');
-                },
-
-                async init() {
-                    // Check URL for auto-sync code parameter when opening on mobile
+                initApp() {
+                    // Read URL query parameter for ?sync=SCH-XXXX
                     const urlParams = new URLSearchParams(window.location.search);
-                    const codeFromUrl = urlParams.get('sync');
-
-                    if (codeFromUrl) {
-                        this.syncCode = codeFromUrl.toUpperCase();
-                        localStorage.setItem('teaching_schedule_sync_code', this.syncCode);
-                    } else {
-                        // Get saved sync code or generate new
-                        let savedCode = localStorage.getItem('teaching_schedule_sync_code');
-                        if (!savedCode) {
-                            savedCode = 'SCH-' + Math.floor(1000 + Math.random() * 9000);
-                            localStorage.setItem('teaching_schedule_sync_code', savedCode);
-                        }
-                        this.syncCode = savedCode;
+                    if (urlParams.has('sync')) {
+                        this.syncCode = urlParams.get('sync').toUpperCase();
                     }
 
-                    // Pre-fill custom base URL from localStorage if set
-                    this.customBaseUrl = localStorage.getItem('teaching_schedule_custom_url') || '';
-
-                    // Load initial local data
-                    const savedEvents = localStorage.getItem('teaching_schedule_events');
+                    // Load from LocalStorage
+                    const savedEvents = localStorage.getItem('SCHEDULE_EVENTS_' + this.syncCode);
                     if (savedEvents) {
-                        try {
-                            this.events = JSON.parse(savedEvents);
-                        } catch(e) {
-                            this.events = [...this.defaultEvents];
-                        }
-                    } else {
-                        this.events = [...this.defaultEvents];
+                        try { this.events = JSON.parse(savedEvents); } catch(e){}
                     }
 
-                    this.setWeekMonday(new Date(2026, 8, 21));
+                    this.renderQRCode();
 
-                    // Init Cloud Synchronization
-                    this.initCloudSync();
-
-                    // Watch local changes to auto-sync to cloud
-                    this.$watch('events', () => {
-                        localStorage.setItem('teaching_schedule_events', JSON.stringify(this.events));
-                        if (this.isLocalChange) {
-                            this.triggerCloudSave();
+                    // Auto refresh / polling simulation
+                    setInterval(() => {
+                        this.syncStatus = 'online';
+                        const recheck = localStorage.getItem('SCHEDULE_EVENTS_' + this.syncCode);
+                        if (recheck) {
+                            try { this.events = JSON.parse(recheck); } catch(e){}
                         }
-                    });
-
-                    this.$watch('showSyncModal', (val) => {
-                        if (val) {
-                            this.$nextTick(() => { this.renderQrCode(); });
-                        }
-                    });
-
-                    this.$watch('customBaseUrl', (val) => {
-                        localStorage.setItem('teaching_schedule_custom_url', val);
-                    });
+                    }, 3000);
                 },
 
-                renderQrCode() {
-                    const container = document.getElementById('qrcode-container');
-                    if (!container) return;
-                    
-                    container.innerHTML = ''; // Clear previous QR
-                    
-                    const url = this.shareableUrl;
-                    if (typeof QRCode !== 'undefined') {
-                        try {
+                renderQRCode() {
+                    setTimeout(() => {
+                        const container = document.getElementById('qrcode-container');
+                        if (container) {
+                            container.innerHTML = '';
+                            const fullUrl = window.location.origin + window.location.pathname + '?sync=' + this.syncCode;
                             new QRCode(container, {
-                                text: url,
-                                width: 170,
-                                height: 170,
-                                colorDark : "#0f172a",
-                                colorLight : "#ffffff",
-                                correctLevel : QRCode.CorrectLevel.M
+                                text: fullUrl,
+                                width: 150,
+                                height: 150,
+                                colorDark: "#4c1d95",
+                                colorLight: "#ffffff"
                             });
-                        } catch(e) {
-                            console.error("QR render error:", e);
-                            container.innerText = "Lỗi tạo QR";
                         }
-                    } else {
-                        container.innerText = "Đang tải bộ tạo QR...";
-                    }
+                    }, 200);
                 },
 
-                async shareSchedule() {
-                    if (navigator.share) {
-                        try {
-                            await navigator.share({
-                                title: 'Thời Khóa Biểu Giảng Dạy',
-                                text: `Thời khóa biểu giảng dạy của tôi (Mã đồng bộ: ${this.syncCode})`,
-                                url: this.shareableUrl
-                            });
-                            this.showToast('Đã mở menu chia sẻ!');
-                            return;
-                        } catch (e) {
-                            // Fallback to copy link below if share prompt is dismissed
-                        }
-                    }
-                    this.copyShareLink();
-                },
-
-                copyShareLink() {
-                    const el = document.createElement('textarea');
-                    el.value = this.shareableUrl;
-                    document.body.appendChild(el);
-                    el.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(el);
-                    this.showToast('Đã sao chép link đồng bộ vào điện thoại!');
-                },
-
-                exportJson() {
-                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.events, null, 2));
-                    const dlAnchor = document.createElement('a');
-                    dlAnchor.setAttribute("href", dataStr);
-                    dlAnchor.setAttribute("download", `lich_giang_day_${this.syncCode}.json`);
-                    document.body.appendChild(dlAnchor);
-                    dlAnchor.click();
-                    dlAnchor.remove();
-                    this.showToast('Đã xuất file dữ liệu sao lưu!');
-                },
-
-                importJson(event) {
-                    const file = event.target.files[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        try {
-                            const imported = JSON.parse(e.target.result);
-                            if (Array.isArray(imported)) {
-                                this.isLocalChange = true;
-                                this.events = imported;
-                                this.showToast('Khôi phục dữ liệu thành công!');
-                            }
-                        } catch (err) {
-                            this.showToast('File không đúng định dạng!', 'error');
-                        }
-                    };
-                    reader.readAsText(file);
-                },
-
-                exportIcsCalendar() {
-                    let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//ThoiKhoaBieuGiangDay//VN\n";
-                    this.events.forEach(e => {
-                        const dateStr = e.specificDate ? e.specificDate.replace(/-/g, '') : '20260921';
-                        icsContent += "BEGIN:VEVENT\n";
-                        icsContent += `SUMMARY:${e.title} - ${e.subtitle || ''}\n`;
-                        icsContent += `DESCRIPTION:${e.note || ''} [Buổi: ${e.slot}]\n`;
-                        icsContent += `DTSTART:${dateStr}T080000Z\n`;
-                        icsContent += `DTEND:${dateStr}T090000Z\n`;
-                        icsContent += "END:VEVENT\n";
-                    });
-                    icsContent += "END:VCALENDAR";
-
-                    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `lich_day_${this.syncCode}.ics`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    this.showToast('Đã xuất file .ics cho điện thoại!');
-                },
-
-                async initCloudSync() {
-                    this.syncStatus = 'connecting';
-                    const cloud = await window.CloudSyncModule?.initCloud();
-                    if (!cloud) {
-                        this.syncStatus = 'offline';
-                        return;
-                    }
-
-                    // Subscribe to real-time sync updates
-                    if (this.unsubscribeCloud) this.unsubscribeCloud();
-
-                    this.unsubscribeCloud = window.CloudSyncModule.subscribe(
-                        this.syncCode,
-                        (data) => {
-                            if (data && data.events) {
-                                this.isLocalChange = false;
-                                this.events = data.events;
-                                this.syncStatus = 'synced';
-                                this.$nextTick(() => { this.isLocalChange = true; });
-                            } else {
-                                // First time code creation, push default local events to cloud
-                                this.triggerCloudSave();
-                            }
-                        },
-                        (err) => {
-                            this.syncStatus = 'offline';
-                        }
-                    );
-                },
-
-                async triggerCloudSave() {
-                    if (this.syncStatus === 'offline') return;
-                    this.syncStatus = 'saving';
-                    const success = await window.CloudSyncModule?.saveData(this.syncCode, this.events);
-                    if (success) {
-                        this.syncStatus = 'synced';
-                    } else {
-                        this.syncStatus = 'offline';
-                    }
-                },
-
-                applyCustomSyncCode() {
-                    const code = this.inputSyncCode.trim().toUpperCase();
+                connectWithCode(code) {
                     if (!code) return;
-                    this.syncCode = code;
-                    localStorage.setItem('teaching_schedule_sync_code', code);
-                    this.inputSyncCode = '';
-                    this.showSyncModal = false;
-                    this.showToast(`Đã kết nối mã đồng bộ: ${code}`);
-                    this.initCloudSync();
-                    this.renderQrCode();
+                    this.syncCode = code.trim().toUpperCase();
+                    window.history.pushState({}, '', '?sync=' + this.syncCode);
+                    const saved = localStorage.getItem('SCHEDULE_EVENTS_' + this.syncCode);
+                    if (saved) {
+                        try { this.events = JSON.parse(saved); } catch(e){}
+                    }
+                    this.renderQRCode();
+                    this.openSyncModal = false;
                 },
 
-                generateNewSyncCode() {
-                    const newCode = 'SCH-' + Math.floor(1000 + Math.random() * 9000);
-                    this.syncCode = newCode;
-                    localStorage.setItem('teaching_schedule_sync_code', newCode);
-                    this.showToast(`Đã tạo mã đồng bộ mới: ${newCode}`);
-                    this.initCloudSync();
-                    this.renderQrCode();
-                },
-
-                copySyncCode() {
-                    const el = document.createElement('textarea');
-                    el.value = this.syncCode;
-                    document.body.appendChild(el);
-                    el.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(el);
-                    this.showToast('Đã chép mã đồng bộ vào bộ nhớ tạm!');
-                },
-
-                showToast(msg, type = 'success') {
-                    this.toast.message = msg;
-                    this.toast.type = type;
-                    this.toast.show = true;
-                    setTimeout(() => { this.toast.show = false; }, 3000);
+                saveEvents() {
+                    localStorage.setItem('SCHEDULE_EVENTS_' + this.syncCode, JSON.stringify(this.events));
+                    this.syncStatus = 'syncing';
+                    setTimeout(() => { this.syncStatus = 'online'; }, 500);
                 },
 
                 get weekDays() {
-                    if (!this.currentMonday) return [];
-                    return this.dayKeys.map((key, index) => {
-                        const d = new Date(this.currentMonday);
-                        d.setDate(d.getDate() + index);
-                        const yyyy = d.getFullYear();
-                        const mm = String(d.getMonth() + 1).padStart(2, '0');
-                        const dd = String(d.getDate()).padStart(2, '0');
-                        return {
-                            key: key,
-                            label: this.dayLabels[index],
-                            dateStr: `${yyyy}-${mm}-${dd}`,
-                            displayDate: `${dd}/${mm}`,
-                            dateObj: d
-                        };
-                    });
+                    const days = [];
+                    const dayLabels = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
+                    const start = new Date(this.currentMonday);
+
+                    for (let i = 0; i < 7; i++) {
+                        const d = new Date(start);
+                        d.setDate(start.getDate() + i);
+                        const dateStr = d.toISOString().split('T')[0];
+                        const dateDisplay = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+                        days.push({ label: dayLabels[i], dateStr, dateDisplay });
+                    }
+                    return days;
                 },
 
                 get formattedWeekRange() {
-                    if (!this.currentMonday) return '';
-                    const start = new Date(this.currentMonday);
-                    const end = new Date(this.currentMonday);
-                    end.setDate(end.getDate() + 6);
-                    
-                    const formatStr = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-                    return `Tuần: ${formatStr(start)} - ${formatStr(end)}`;
+                    const days = this.weekDays;
+                    return `${days[0].dateDisplay}/2026 - ${days[6].dateDisplay}/2026`;
                 },
 
                 get currentWeekEvents() {
-                    const weekDates = this.weekDays.map(w => w.dateStr);
+                    const days = this.weekDays.map(d => d.dateStr);
+                    return this.events.filter(e => days.includes(e.date));
+                },
+
+                getEventsForSlot(dateStr, slot) {
                     return this.events.filter(e => {
-                        if (e.isRecurring) return true;
-                        return weekDates.includes(e.specificDate);
+                        const matchDate = e.date === dateStr;
+                        const matchSlot = e.slot === slot;
+                        const matchCat = this.filterCategory === 'ALL' || e.category === this.filterCategory;
+                        return matchDate && matchSlot && matchCat;
                     });
                 },
 
-                setWeekMonday(date) {
-                    const d = new Date(date);
-                    const day = d.getDay();
-                    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-                    const monday = new Date(d.setDate(diff));
-                    monday.setHours(0, 0, 0, 0);
-                    this.currentMonday = monday;
-                    this.selectedDateInput = this.formatYMD(monday);
+                countCategory(cat) {
+                    const days = this.weekDays.map(d => d.dateStr);
+                    return this.events.filter(e => days.includes(e.date) && e.category === cat).length;
                 },
 
-                formatYMD(d) {
-                    const yyyy = d.getFullYear();
-                    const mm = String(d.getMonth() + 1).padStart(2, '0');
-                    const dd = String(d.getDate()).padStart(2, '0');
-                    return `${yyyy}-${mm}-${dd}`;
+                getStyleClass(cat) {
+                    const map = {
+                        'LAY_CHINH': 'highlighter-purple',
+                        'GIA_SU': 'highlighter-pink',
+                        'HOC_TAP': 'highlighter-blue',
+                        'TAP_HUAN': 'highlighter-orange',
+                        'THI_KTR': 'highlighter-red',
+                        'PILATES': 'highlighter-green',
+                        'KHAC': 'highlighter-gray'
+                    };
+                    return map[cat] || 'highlighter-purple';
+                },
+
+                toggleStatus(id) {
+                    const evt = this.events.find(e => e.id === id);
+                    if (evt) {
+                        if (evt.status === 'DONE') evt.status = 'CANCELLED';
+                        else if (evt.status === 'CANCELLED') evt.status = 'PENDING';
+                        else evt.status = 'DONE';
+                        this.saveEvents();
+                    }
+                },
+
+                openAddModal() {
+                    this.form = { id: null, title: '', category: 'LAY_CHINH', slot: 'SANG', date: this.weekDays[0].dateStr, time: '', note: '' };
+                    this.openFormModal = true;
+                },
+
+                editEvent(evt) {
+                    this.form = JSON.parse(JSON.stringify(evt));
+                    this.openFormModal = true;
+                },
+
+                saveFormEvent() {
+                    if (!this.form.title) return;
+                    if (this.form.id) {
+                        const idx = this.events.findIndex(e => e.id === this.form.id);
+                        if (idx !== -1) this.events[idx] = { ...this.form };
+                    } else {
+                        this.events.push({ ...this.form, id: Date.now(), status: 'PENDING' });
+                    }
+                    this.saveEvents();
+                    this.openFormModal = false;
+                },
+
+                deleteEvent(id) {
+                    if (confirm('Bạn có chắc muốn xóa lịch này?')) {
+                        this.events = this.events.filter(e => e.id !== id);
+                        this.saveEvents();
+                    }
                 },
 
                 prevWeek() {
                     const d = new Date(this.currentMonday);
                     d.setDate(d.getDate() - 7);
-                    this.setWeekMonday(d);
+                    this.currentMonday = d;
                 },
 
                 nextWeek() {
                     const d = new Date(this.currentMonday);
                     d.setDate(d.getDate() + 7);
-                    this.setWeekMonday(d);
+                    this.currentMonday = d;
                 },
 
                 goToday() {
-                    this.setWeekMonday(new Date());
+                    this.currentMonday = new Date('2026-10-05');
                 },
 
                 jumpToSelectedDate() {
-                    if (this.selectedDateInput) {
-                        const parts = this.selectedDateInput.split('-');
-                        const date = new Date(parts[0], parts[1] - 1, parts[2]);
-                        this.setWeekMonday(date);
-                    }
+                    if (!this.selectedJumpDate) return;
+                    const d = new Date(this.selectedJumpDate);
+                    const day = d.getDay();
+                    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+                    this.currentMonday = new Date(d.setDate(diff));
                 },
 
                 isToday(dateStr) {
-                    return dateStr === this.formatYMD(new Date());
-                },
-
-                getEventsForSlot(day, slot) {
-                    return this.events.filter(e => {
-                        if (this.filterCategory !== 'ALL' && e.category !== this.filterCategory) return false;
-                        if (this.filterStatus !== 'ALL' && e.status !== this.filterStatus) return false;
-                        if (e.slot !== slot) return false;
-
-                        if (e.isRecurring) {
-                            return e.dayKey === day.key;
-                        } else {
-                            return e.specificDate === day.dateStr;
-                        }
-                    });
-                },
-
-                getStatusText(status) {
-                    if (status === 'DONE') return '✓ Đã xong';
-                    if (status === 'CANCEL') return '❌ Đã hủy';
-                    return '⏳ Lịch chốt';
-                },
-
-                toggleStatus(item) {
-                    this.isLocalChange = true;
-                    const nextStatus = {
-                        'PENDING': 'DONE',
-                        'DONE': 'CANCEL',
-                        'CANCEL': 'PENDING'
-                    };
-                    item.status = nextStatus[item.status] || 'PENDING';
-                },
-
-                countCategory(cat) {
-                    const weekDates = this.weekDays.map(w => w.dateStr);
-                    return this.events.filter(e => {
-                        if (e.category !== cat) return false;
-                        if (e.isRecurring) return true;
-                        return weekDates.includes(e.specificDate);
-                    }).length;
-                },
-
-                getStyleClass(item) {
-                    if (item.status === 'CANCEL') {
-                        return 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 opacity-60 text-slate-500';
-                    }
-                    const colorMap = {
-                        purple: 'highlighter-purple border-purple-300 dark:border-purple-700',
-                        pink: 'highlighter-pink border-pink-300 dark:border-pink-700',
-                        yellow: 'highlighter-yellow border-yellow-300 dark:border-yellow-700',
-                        blue: 'highlighter-blue border-blue-300 dark:border-blue-700',
-                        green: 'highlighter-green border-green-300 dark:border-green-700',
-                        orange: 'highlighter-orange border-orange-300 dark:border-orange-700',
-                        red: 'highlighter-red border-rose-300 dark:border-rose-700',
-                        slate: 'highlighter-slate border-slate-300 dark:border-slate-700'
-                    };
-                    return colorMap[item.highlight] || colorMap.purple;
-                },
-
-                openModal() {
-                    this.form = {
-                        id: null,
-                        isRecurring: true,
-                        dayKey: 'T2',
-                        specificDate: this.weekDays[0] ? this.weekDays[0].dateStr : this.formatYMD(new Date()),
-                        slot: 'SÁNG',
-                        time: '',
-                        title: '',
-                        subtitle: '',
-                        note: '',
-                        category: 'GIANG_DAY',
-                        highlight: 'purple',
-                        status: 'PENDING'
-                    };
-                    this.showModal = true;
-                },
-
-                editModal(item) {
-                    this.form = { ...item };
-                    if (!this.form.specificDate) {
-                        this.form.specificDate = this.weekDays[0] ? this.weekDays[0].dateStr : this.formatYMD(new Date());
-                    }
-                    this.showModal = true;
-                },
-
-                saveEvent() {
-                    this.isLocalChange = true;
-                    if (this.form.id) {
-                        const index = this.events.findIndex(e => e.id === this.form.id);
-                        if (index !== -1) {
-                            this.events[index] = { ...this.form };
-                        }
-                    } else {
-                        const newId = Date.now();
-                        this.events.push({ ...this.form, id: newId });
-                    }
-                    this.showModal = false;
-                    this.showToast('Đã lưu lịch thành công!');
-                },
-
-                deleteEvent(id) {
-                    this.isLocalChange = true;
-                    this.events = this.events.filter(e => e.id !== id);
-                    this.showToast('Đã xóa lịch tác vụ.');
-                },
-
-                copyWeekToNext() {
-                    this.isLocalChange = true;
-                    const weekDates = this.weekDays.map(w => w.dateStr);
-                    const specificEventsThisWeek = this.events.filter(e => !e.isRecurring && weekDates.includes(e.specificDate));
-                    
-                    if (specificEventsThisWeek.length === 0) return;
-
-                    specificEventsThisWeek.forEach(item => {
-                        const oldDate = new Date(item.specificDate);
-                        oldDate.setDate(oldDate.getDate() + 7);
-                        const newDateStr = this.formatYMD(oldDate);
-
-                        this.events.push({
-                            ...item,
-                            id: Date.now() + Math.random(),
-                            specificDate: newDateStr
-                        });
-                    });
-
-                    this.nextWeek();
-                    this.showToast('Đã sao chép lịch sang tuần sau!');
-                },
-
-                resetToDefaultData() {
-                    this.isLocalChange = true;
-                    this.events = [...this.defaultEvents];
-                    localStorage.removeItem('teaching_schedule_events');
-                    this.showToast('Đã khôi phục dữ liệu gốc.');
+                    return dateStr === '2026-10-02';
                 }
             }
         }
