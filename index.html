@@ -57,7 +57,7 @@
                         class="px-3 py-1.5 text-xs font-semibold rounded-full border flex items-center space-x-2 transition hover:shadow-sm">
                     <span class="w-2 h-2 rounded-full" 
                           :class="syncStatus === 'online' ? 'bg-emerald-500 animate-pulse' : (syncStatus === 'syncing' ? 'bg-amber-500 animate-spin' : 'bg-slate-400')"></span>
-                    <span x-text="syncStatus === 'online' ? 'Trực tuyến (' + syncCode + ')' : (syncStatus === 'syncing' ? 'Đang lưu...' : 'Ngoại tuyến')"></span>
+                    <span x-text="syncStatus === 'online' ? 'Đám mây kết nối (' + syncCode + ')' : (syncStatus === 'syncing' ? 'Đang lưu Cloud...' : 'Ngoại tuyến')"></span>
                 </button>
 
                 <!-- Navigation Controls -->
@@ -95,7 +95,7 @@
                 </button>
 
                 <!-- Sync Modal Trigger -->
-                <button @click="openSyncModal = true" class="p-2 text-slate-500 hover:text-purple-600 hover:bg-slate-100 rounded-xl transition" title="Mã QR & Đồng bộ">
+                <button @click="openSyncModal = true" class="p-2 text-slate-500 hover:text-purple-600 hover:bg-slate-100 rounded-xl transition" title="Mã QR & Đồng bộ Cloud">
                     <i class="fa-solid fa-qrcode text-base"></i>
                 </button>
             </div>
@@ -320,8 +320,8 @@
             <button @click="openSyncModal = false" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
                 <i class="fa-solid fa-xmark text-lg"></i>
             </button>
-            <h3 class="text-lg font-bold text-slate-900 mb-1">Đồng Bộ Nhiều Thiết Bị</h3>
-            <p class="text-xs text-slate-500 mb-4">Quét mã QR để mở trang web tự động đồng bộ</p>
+            <h3 class="text-lg font-bold text-slate-900 mb-1">Đồng Bộ Đám Mây Nhiều Thiết Bị</h3>
+            <p class="text-xs text-slate-500 mb-4">Quét mã QR để điện thoại tự động kết nối chung Cloud</p>
 
             <!-- QR Display -->
             <div class="flex justify-center my-4">
@@ -330,9 +330,9 @@
 
             <!-- Sync Info -->
             <div class="bg-purple-50 p-3 rounded-2xl border border-purple-100 mb-4">
-                <p class="text-xs text-purple-700 font-bold">MÃ ĐỒNG BỘ CÁ NHÂN CỦA BẠN</p>
+                <p class="text-xs text-purple-700 font-bold">MÃ ĐỒNG BỘ CLOUD CỦA BẠN</p>
                 <p class="text-xl font-black text-purple-900 tracking-wider mt-0.5" x-text="syncCode"></p>
-                <p class="text-[11px] text-purple-600 mt-1">Dùng mã này gõ vào điện thoại để kết nối chung dữ liệu</p>
+                <p class="text-[11px] text-purple-600 mt-1">Dùng mã này gõ vào thiết bị khác để dùng chung dữ liệu</p>
             </div>
 
             <!-- Connect Manual -->
@@ -348,8 +348,10 @@
         </div>
     </div>
 
-    <!-- Application Script -->
+    <!-- Application Script with Real Cloud REST Sync -->
     <script>
+        const PANTRY_ID = 'd8299fa5-f938-4e89-a299-a9bf7f9f3812'; // Global Cloud Pantry ID
+
         function scheduleApp() {
             return {
                 syncCode: 'SCH-4692',
@@ -360,11 +362,12 @@
                 filterCategory: 'ALL',
                 selectedJumpDate: '',
                 currentMonday: new Date('2026-10-05'),
+                lastSyncHash: '',
 
                 form: { id: null, title: '', category: 'LAY_CHINH', slot: 'SANG', date: '', time: '', note: '' },
 
                 events: [
-                    // Tuần 05/10 - 11/10
+                    // Mặc định ban đầu
                     { id: 1, title: 'TẬP PILATES', category: 'PILATES', slot: 'SANG', date: '2026-10-06', time: '07:00 - 08:00', note: 'Pilates Reformer', status: 'CANCELLED' },
                     { id: 2, title: 'TẬP PILATES', category: 'PILATES', slot: 'SANG', date: '2026-10-08', time: '07:00 - 08:00', note: 'Pilates Mat & Core', status: 'DONE' },
                     { id: 3, title: 'TẬP PILATES', category: 'PILATES', slot: 'SANG', date: '2026-10-10', time: '08:00 - 09:00', note: 'Pilates Cadic/Reformer', status: 'DONE' },
@@ -372,29 +375,74 @@
                     { id: 5, title: 'VB2 TANC 1', category: 'HOC_TAP', slot: 'TOI', date: '2026-10-07', time: '18:00 - 20:00', note: 'Lớp VB2 T4', status: 'DONE' }
                 ],
 
-                initApp() {
-                    // Read URL query parameter for ?sync=SCH-XXXX
+                async initApp() {
+                    // Đọc tham số mã đồng bộ từ URL ?sync=SCH-XXXX
                     const urlParams = new URLSearchParams(window.location.search);
                     if (urlParams.has('sync')) {
                         this.syncCode = urlParams.get('sync').toUpperCase();
                     }
 
-                    // Load from LocalStorage
-                    const savedEvents = localStorage.getItem('SCHEDULE_EVENTS_' + this.syncCode);
-                    if (savedEvents) {
-                        try { this.events = JSON.parse(savedEvents); } catch(e){}
+                    // Tải dữ liệu ban đầu từ LocalStorage
+                    const saved = localStorage.getItem('SCHEDULE_EVENTS_' + this.syncCode);
+                    if (saved) {
+                        try { this.events = JSON.parse(saved); } catch(e){}
                     }
 
+                    // Kéo dữ liệu mới nhất từ Cloud Server
+                    await this.pullFromCloud();
                     this.renderQRCode();
 
-                    // Auto refresh / polling simulation
-                    setInterval(() => {
-                        this.syncStatus = 'online';
-                        const recheck = localStorage.getItem('SCHEDULE_EVENTS_' + this.syncCode);
-                        if (recheck) {
-                            try { this.events = JSON.parse(recheck); } catch(e){}
-                        }
+                    // Vòng lặp tự động quét Cloud mỗi 3 giây
+                    setInterval(async () => {
+                        await this.pullFromCloud();
                     }, 3000);
+                },
+
+                // Gửi dữ liệu lên Server Đám Mây
+                async pushToCloud() {
+                    this.syncStatus = 'syncing';
+                    localStorage.setItem('SCHEDULE_EVENTS_' + this.syncCode, JSON.stringify(this.events));
+
+                    try {
+                        const response = await fetch(`https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${this.syncCode}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                updatedAt: Date.now(),
+                                events: this.events
+                            })
+                        });
+
+                        if (response.ok) {
+                            this.syncStatus = 'online';
+                        } else {
+                            this.syncStatus = 'offline';
+                        }
+                    } catch (e) {
+                        console.error("Lỗi gửi Cloud:", e);
+                        this.syncStatus = 'offline';
+                    }
+                },
+
+                // Tải dữ liệu từ Server Đám Mây xuống
+                async pullFromCloud() {
+                    try {
+                        const response = await fetch(`https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${this.syncCode}`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data && data.events) {
+                                const newHash = JSON.stringify(data.events);
+                                if (newHash !== this.lastSyncHash) {
+                                    this.events = data.events;
+                                    this.lastSyncHash = newHash;
+                                    localStorage.setItem('SCHEDULE_EVENTS_' + this.syncCode, newHash);
+                                }
+                            }
+                            this.syncStatus = 'online';
+                        }
+                    } catch (e) {
+                        // Ngoại lệ khi chưa có basket trên cloud
+                    }
                 },
 
                 renderQRCode() {
@@ -414,22 +462,13 @@
                     }, 200);
                 },
 
-                connectWithCode(code) {
+                async connectWithCode(code) {
                     if (!code) return;
                     this.syncCode = code.trim().toUpperCase();
                     window.history.pushState({}, '', '?sync=' + this.syncCode);
-                    const saved = localStorage.getItem('SCHEDULE_EVENTS_' + this.syncCode);
-                    if (saved) {
-                        try { this.events = JSON.parse(saved); } catch(e){}
-                    }
+                    await this.pullFromCloud();
                     this.renderQRCode();
                     this.openSyncModal = false;
-                },
-
-                saveEvents() {
-                    localStorage.setItem('SCHEDULE_EVENTS_' + this.syncCode, JSON.stringify(this.events));
-                    this.syncStatus = 'syncing';
-                    setTimeout(() => { this.syncStatus = 'online'; }, 500);
                 },
 
                 get weekDays() {
@@ -484,13 +523,13 @@
                     return map[cat] || 'highlighter-purple';
                 },
 
-                toggleStatus(id) {
+                async toggleStatus(id) {
                     const evt = this.events.find(e => e.id === id);
                     if (evt) {
                         if (evt.status === 'DONE') evt.status = 'CANCELLED';
                         else if (evt.status === 'CANCELLED') evt.status = 'PENDING';
                         else evt.status = 'DONE';
-                        this.saveEvents();
+                        await this.pushToCloud();
                     }
                 },
 
@@ -504,7 +543,7 @@
                     this.openFormModal = true;
                 },
 
-                saveFormEvent() {
+                async saveFormEvent() {
                     if (!this.form.title) return;
                     if (this.form.id) {
                         const idx = this.events.findIndex(e => e.id === this.form.id);
@@ -512,14 +551,14 @@
                     } else {
                         this.events.push({ ...this.form, id: Date.now(), status: 'PENDING' });
                     }
-                    this.saveEvents();
+                    await this.pushToCloud();
                     this.openFormModal = false;
                 },
 
-                deleteEvent(id) {
+                async deleteEvent(id) {
                     if (confirm('Bạn có chắc muốn xóa lịch này?')) {
                         this.events = this.events.filter(e => e.id !== id);
-                        this.saveEvents();
+                        await this.pushToCloud();
                     }
                 },
 
